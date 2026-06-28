@@ -1,0 +1,976 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSeek DB Agent — Analytics Platform</title>
+    <!-- Load ALL scripts with defer so DOM is ready before they execute -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js" defer></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        * { font-family: 'Inter', sans-serif; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        :root {
+            --bg: #020617;
+            --bg1: #0f172a;
+            --bg2: #1e293b;
+            --border: rgba(255,255,255,0.06);
+            --indigo: #6366f1;
+            --purple: #a855f7;
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --rose: #f43f5e;
+            --cyan: #06b6d4;
+        }
+
+        html, body { height: 100%; overflow: hidden; background: var(--bg); color: #e2e8f0; }
+
+        .aurora {
+            background:
+                radial-gradient(ellipse 70% 50% at 15% 10%, rgba(99,102,241,0.14) 0%, transparent 55%),
+                radial-gradient(ellipse 55% 45% at 85% 85%, rgba(168,85,247,0.10) 0%, transparent 55%),
+                radial-gradient(ellipse 45% 35% at 50% 50%, rgba(6,182,212,0.05) 0%, transparent 65%),
+                #020617;
+        }
+
+        /* ── Scrollbar ── */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 99px; }
+
+        /* ── Glass ── */
+        .glass {
+            background: rgba(15,23,42,0.75);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+        }
+        .glass-sm {
+            background: rgba(30,41,59,0.6);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255,255,255,0.07);
+        }
+
+        /* ── Layout ── */
+        #app { display: flex; height: 100vh; width: 100vw; }
+
+        /* ── LOGIN ── */
+        #login-screen {
+            position: fixed; inset: 0; z-index: 100;
+            display: flex; align-items: center; justify-content: center; padding: 16px;
+            background:
+                radial-gradient(ellipse 70% 50% at 15% 10%, rgba(99,102,241,0.14) 0%, transparent 55%),
+                radial-gradient(ellipse 55% 45% at 85% 85%, rgba(168,85,247,0.10) 0%, transparent 55%),
+                #020617;
+        }
+        .login-card {
+            width: 100%; max-width: 420px;
+            background: linear-gradient(145deg, rgba(15,23,42,0.95), rgba(15,23,42,0.80));
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(99,102,241,0.22);
+            border-radius: 24px;
+            padding: 36px 32px;
+            box-shadow: 0 0 60px rgba(99,102,241,0.12), 0 30px 70px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.05);
+            animation: fadeUp 0.5s ease forwards;
+        }
+        @keyframes fadeUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+        .login-logo {
+            display: flex; flex-direction: column; align-items: center; margin-bottom: 28px;
+        }
+        .logo-icon {
+            width: 64px; height: 64px; border-radius: 18px;
+            background: linear-gradient(135deg, rgba(99,102,241,0.2), rgba(168,85,247,0.2));
+            border: 1px solid rgba(99,102,241,0.3);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 14px; position: relative;
+        }
+        .logo-icon svg { width: 28px; height: 28px; color: #818cf8; }
+        .logo-dot {
+            position: absolute; top: -4px; right: -4px;
+            width: 14px; height: 14px; border-radius: 50%;
+            background: #10b981; border: 2px solid #020617;
+        }
+        .login-title { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -0.5px; }
+        .login-sub { font-size: 13px; color: #64748b; margin-top: 4px; }
+        .login-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            margin-top: 10px; padding: 4px 12px; border-radius: 99px;
+            background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25);
+            font-size: 11px; color: #34d399; font-family: 'JetBrains Mono', monospace;
+        }
+        .login-badge span { width: 6px; height: 6px; border-radius: 50%; background: #34d399; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%,100%{opacity:.4;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+
+        .input-label { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: #475569; margin-bottom: 6px; }
+        .input-wrap { position: relative; margin-bottom: 14px; }
+        .input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #475569; pointer-events: none; }
+        .input-icon svg { width: 16px; height: 16px; }
+        .form-input {
+            width: 100%; padding: 11px 14px 11px 40px;
+            background: rgba(2,6,23,0.7); border: 1px solid rgba(99,102,241,0.15);
+            border-radius: 12px; color: #e2e8f0; font-size: 13px; outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-input:focus { border-color: rgba(99,102,241,0.5); box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
+        .form-input::placeholder { color: #334155; }
+
+        .launch-btn {
+            width: 100%; padding: 12px; margin-top: 6px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            border: none; border-radius: 12px; color: #fff;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            box-shadow: 0 4px 20px rgba(99,102,241,0.45);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .launch-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 28px rgba(99,102,241,0.55); }
+        .launch-btn svg { width: 16px; height: 16px; }
+
+        .login-stats { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; margin-top: 20px; }
+        .stat-box {
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 12px; padding: 12px 8px; text-align: center;
+        }
+        .stat-val { font-size: 18px; font-weight: 800; }
+        .stat-lbl { font-size: 10px; color: #475569; margin-top: 2px; }
+
+        /* ── SIDEBAR ── */
+        #sidebar {
+            width: 270px; min-width: 270px;
+            border-right: 1px solid rgba(255,255,255,0.05);
+            background: rgba(2,6,23,0.6);
+            backdrop-filter: blur(20px);
+            display: flex; flex-direction: column;
+            height: 100vh;
+        }
+        .sidebar-brand {
+            padding: 18px 16px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex; align-items: center; gap: 10px;
+        }
+        .brand-icon {
+            width: 36px; height: 36px; border-radius: 10px;
+            background: linear-gradient(135deg,rgba(99,102,241,.22),rgba(168,85,247,.22));
+            border: 1px solid rgba(99,102,241,.25);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .brand-icon svg { width: 17px; height: 17px; color: #818cf8; }
+        .brand-name { font-size: 13px; font-weight: 700; color: #fff; }
+        .brand-ver { font-size: 10px; color: #6366f1; font-family: 'JetBrains Mono',monospace; letter-spacing:.08em; }
+
+        .sidebar-scroll { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 16px; }
+
+        .section-label {
+            font-size: 10px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .1em; color: #334155; padding: 0 4px; margin-bottom: 4px;
+        }
+        .quick-btn {
+            width: 100%; text-align: left; padding: 8px 10px;
+            background: rgba(15,23,42,0.5); border: 1px solid rgba(255,255,255,0.04);
+            border-radius: 10px; color: #94a3b8; font-size: 12px; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+            transition: all 0.15s ease; white-space: nowrap; overflow: hidden;
+        }
+        .quick-btn:hover { background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25); color: #e2e8f0; transform: translateX(2px); }
+        .quick-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+        .qb-label { overflow: hidden; text-overflow: ellipsis; }
+
+        .history-pill {
+            display: block; width: 100%; text-align: left;
+            padding: 6px 10px; border-radius: 8px; font-size: 11px;
+            color: #64748b; cursor: pointer; font-family: 'JetBrains Mono',monospace;
+            background: rgba(99,102,241,0.06); border: 1px solid rgba(99,102,241,0.1);
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+            transition: all 0.15s;
+        }
+        .history-pill:hover { background: rgba(99,102,241,0.15); color: #a5b4fc; }
+
+        .sidebar-footer {
+            padding: 12px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+        .user-card {
+            display: flex; align-items: center; justify-content: space-between;
+            background: rgba(30,41,59,0.5); border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px; padding: 10px 12px;
+        }
+        .user-info { display: flex; align-items: center; gap: 10px; }
+        .user-avatar {
+            width: 32px; height: 32px; border-radius: 9px;
+            background: linear-gradient(135deg,#4f46e5,#7c3aed);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; color: #fff;
+        }
+        .user-name { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+        .user-status { font-size: 10px; color: #34d399; font-family: 'JetBrains Mono',monospace; }
+        .icon-btn {
+            background: none; border: none; cursor: pointer; padding: 6px; border-radius: 8px;
+            color: #475569; transition: all 0.15s;
+        }
+        .icon-btn:hover { background: rgba(244,63,94,0.1); color: #f43f5e; }
+        .icon-btn svg { width: 15px; height: 15px; display: block; }
+
+        /* ── MAIN ── */
+        #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+        #topbar {
+            height: 52px; border-bottom: 1px solid rgba(255,255,255,0.05);
+            background: rgba(2,6,23,0.7); backdrop-filter: blur(16px);
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 0 20px; flex-shrink: 0; z-index: 10;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 10px; }
+        .topbar-title { font-size: 13px; font-weight: 600; color: #fff; }
+        .live-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 3px 10px; border-radius: 99px;
+            background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2);
+            font-size: 11px; color: #818cf8; font-weight: 500;
+        }
+        .live-dot { width: 6px; height: 6px; border-radius: 50%; background: #818cf8; animation: pulse 2s infinite; }
+
+        #proc-badge {
+            display: none; align-items: center; gap: 8px;
+            padding: 5px 12px; border-radius: 10px;
+            background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2);
+            font-size: 11px; color: #fbbf24;
+        }
+        #proc-badge.show { display: flex; }
+        .proc-dots { display: flex; gap: 3px; }
+        .proc-dot { width: 5px; height: 5px; border-radius: 50%; background: #fbbf24; }
+        .proc-dot:nth-child(1){animation:pulse 1.2s 0s infinite}
+        .proc-dot:nth-child(2){animation:pulse 1.2s .2s infinite}
+        .proc-dot:nth-child(3){animation:pulse 1.2s .4s infinite}
+
+        #chat { flex: 1; overflow-y: auto; padding: 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+
+        .bubble-row { display: flex; gap: 10px; animation: fadeUp 0.3s ease forwards; }
+        .bubble-row.user { flex-direction: row-reverse; }
+        .avatar {
+            width: 34px; height: 34px; border-radius: 10px; flex-shrink: 0;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .avatar.agent { background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.2); }
+        .avatar.agent svg { width: 16px; height: 16px; color: #818cf8; }
+        .avatar.user-av {
+            background: linear-gradient(135deg,#4f46e5,#7c3aed);
+            font-size: 12px; font-weight: 700; color: #fff;
+        }
+
+        .bubble {
+            border-radius: 16px; padding: 12px 16px;
+            font-size: 13px; line-height: 1.65; max-width: 80%;
+        }
+        .bubble.agent { background: rgba(15,23,42,0.7); border: 1px solid rgba(255,255,255,0.06); border-top-left-radius: 4px; color: #cbd5e1; }
+        .bubble.user { background: linear-gradient(135deg,#4f46e5,#6d28d9); border-top-right-radius: 4px; color: #fff; }
+
+        /* ── Result blocks ── */
+        .result-block { margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.07); }
+        .result-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 14px; background: rgba(2,6,23,0.8); border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .result-header-left { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #475569; font-family: 'JetBrains Mono',monospace; }
+        .result-header-left svg { width: 12px; height: 12px; }
+        .export-btn { background:none; border:none; font-size:11px; color:#6366f1; cursor:pointer; display:flex; align-items:center; gap:4px; }
+        .export-btn:hover { color: #818cf8; }
+        .export-btn svg { width: 11px; height: 11px; }
+        .chart-wrap { background: rgba(2,6,23,0.6); padding: 16px; height: 210px; }
+        .mermaid-wrap { background: rgba(2,6,23,0.5); padding: 16px; display: flex; justify-content: center; }
+
+        .metric-card {
+            background: linear-gradient(135deg,rgba(99,102,241,0.12),rgba(168,85,247,0.07));
+            border: 1px solid rgba(99,102,241,0.22); border-radius: 14px;
+            padding: 20px; margin-top: 10px;
+        }
+        .metric-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing:.1em; color: #475569; margin-bottom: 6px; }
+        .metric-val { font-size: 40px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+
+        .info-table { width: 100%; border-collapse: collapse; margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.07); }
+        .info-table-head {
+            display: flex; align-items: center; gap: 7px;
+            padding: 10px 14px; font-size: 12px; font-weight: 600;
+        }
+        .info-table-head svg { width: 14px; height: 14px; }
+        .info-table td { padding: 9px 14px; font-size: 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+        .info-table tr:last-child td { border-bottom: none; }
+        .info-table td:first-child { color: #64748b; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing:.06em; width: 130px; background: rgba(15,23,42,0.5); }
+        .info-table td:last-child { color: #e2e8f0; background: rgba(2,6,23,0.4); }
+
+        .sql-block { background: rgba(2,6,23,0.8); border-top: 1px solid rgba(255,255,255,0.05); }
+        .sql-header { padding: 6px 14px; display: flex; align-items: center; gap: 5px; font-size: 10px; color: #334155; font-family:'JetBrains Mono',monospace; }
+        .sql-header svg { width: 11px; height: 11px; }
+        .sql-body { padding: 8px 14px; font-size: 11px; color: #818cf8; font-family:'JetBrains Mono',monospace; overflow-x: auto; }
+
+        /* ── INPUT BAR ── */
+        #input-area {
+            flex-shrink: 0; padding: 14px 20px 18px;
+            background: linear-gradient(to top, #020617 60%, transparent);
+        }
+        .input-bar {
+            max-width: 900px; margin: 0 auto;
+            background: rgba(15,23,42,0.8); backdrop-filter: blur(16px);
+            border: 1px solid rgba(255,255,255,0.07); border-radius: 18px;
+            padding: 8px 10px; display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+            transition: border-color 0.2s;
+        }
+        .input-bar:focus-within { border-color: rgba(99,102,241,0.35); }
+        .bar-icon-btn {
+            padding: 8px; background: none; border: none; cursor: pointer;
+            color: #475569; border-radius: 10px; display: flex; align-items: center;
+            transition: all 0.15s;
+        }
+        .bar-icon-btn:hover { background: rgba(99,102,241,0.1); color: #818cf8; }
+        .bar-icon-btn svg { width: 17px; height: 17px; display: block; }
+        #query-input {
+            flex: 1; background: none; border: none; outline: none;
+            color: #e2e8f0; font-size: 13px; padding: 4px 6px;
+        }
+        #query-input::placeholder { color: #334155; }
+        .send-btn {
+            padding: 9px 12px; background: linear-gradient(135deg,#4f46e5,#7c3aed);
+            border: none; border-radius: 12px; color: #fff; cursor: pointer;
+            display: flex; align-items: center; box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+            transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .send-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.55); }
+        .send-btn svg { width: 15px; height: 15px; display: block; }
+
+        .file-indicator {
+            max-width: 900px; margin: 8px auto 0; padding: 5px 12px;
+            background: rgba(99,102,241,0.08); border: 1px solid rgba(99,102,241,0.2);
+            border-radius: 10px; font-size: 11px; color: #818cf8;
+            display: none; align-items: center; justify-content: space-between; width: fit-content; gap: 12px;
+            font-family: 'JetBrains Mono',monospace;
+        }
+        .file-indicator.show { display: flex; }
+        .file-x { background:none;border:none;color:#475569;cursor:pointer; }
+        .file-x:hover { color: #f43f5e; }
+        .file-x svg { width:13px;height:13px;display:block; }
+
+        /* ── particles ── */
+        .particle { position:fixed; border-radius:50%; pointer-events:none; animation:floatUp linear infinite; opacity:0; }
+        @keyframes floatUp {
+            0% { transform:translateY(100vh) rotate(0deg); opacity:0; }
+            10% { opacity:0.25; }
+            90% { opacity:0.25; }
+            100% { transform:translateY(-80px) rotate(720deg); opacity:0; }
+        }
+
+        /* ── Mic active ── */
+        .mic-active { color: #f43f5e !important; animation: pulse 1s infinite; }
+
+        /* color tints for info tables */
+        .tint-rose .info-table-head { background: rgba(244,63,94,0.1); color: #fb7185; border-bottom:1px solid rgba(244,63,94,0.15); }
+        .tint-orange .info-table-head { background: rgba(249,115,22,0.1); color: #fb923c; border-bottom:1px solid rgba(249,115,22,0.15); }
+        .tint-yellow .info-table-head { background: rgba(234,179,8,0.1); color: #facc15; border-bottom:1px solid rgba(234,179,8,0.15); }
+        .tint-red .info-table-head { background: rgba(239,68,68,0.1); color: #f87171; border-bottom:1px solid rgba(239,68,68,0.15); }
+        .tint-violet .info-table-head { background: rgba(139,92,246,0.1); color: #c4b5fd; border-bottom:1px solid rgba(139,92,246,0.15); }
+        .tint-sky .info-table-head { background: rgba(14,165,233,0.1); color: #38bdf8; border-bottom:1px solid rgba(14,165,233,0.15); }
+        .tint-teal .info-table-head { background: rgba(20,184,166,0.1); color: #2dd4bf; border-bottom:1px solid rgba(20,184,166,0.15); }
+        .tint-indigo .info-table-head { background: rgba(99,102,241,0.1); color: #818cf8; border-bottom:1px solid rgba(99,102,241,0.15); }
+        .tint-cyan .info-table-head { background: rgba(6,182,212,0.1); color: #22d3ee; border-bottom:1px solid rgba(6,182,212,0.15); }
+    </style>
+</head>
+<body class="aurora">
+
+<!-- Particles container -->
+<div id="particles-container" style="position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;"></div>
+
+<!-- ══════════════ LOGIN ══════════════ -->
+<div id="login-screen">
+    <div class="login-card">
+        <div class="login-logo">
+            <div class="logo-icon">
+                <!-- CPU icon inline SVG -->
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/>
+                    <line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>
+                    <line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>
+                    <line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>
+                    <line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>
+                </svg>
+                <div class="logo-dot"></div>
+            </div>
+            <div class="login-title">DeepSeek DB Agent</div>
+            <div class="login-sub">Analytics Platform</div>
+            <div class="login-badge">
+                <span></span> v1.2.0 — Agent Ready
+            </div>
+        </div>
+
+        <label class="input-label">Your Name</label>
+        <div class="input-wrap">
+            <div class="input-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <input id="login-name" class="form-input" type="text" placeholder="Enter your name..." value="User Admin">
+        </div>
+
+        <label class="input-label">Access Token</label>
+        <div class="input-wrap">
+            <div class="input-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            </div>
+            <input id="login-token" class="form-input" type="password" placeholder="Access token..." value="demo-token">
+        </div>
+
+        <button class="launch-btn" onclick="launchApp()">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Launch Dashboard
+        </button>
+
+        <div class="login-stats">
+            <div class="stat-box"><div class="stat-val" style="color:#818cf8">5+</div><div class="stat-lbl">Chart Types</div></div>
+            <div class="stat-box"><div class="stat-val" style="color:#a78bfa">AI</div><div class="stat-lbl">Powered</div></div>
+            <div class="stat-box"><div class="stat-val" style="color:#34d399">Live</div><div class="stat-lbl">Data Feed</div></div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ APP ══════════════ -->
+<div id="app" style="display:none;">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar">
+        <div class="sidebar-brand">
+            <div class="brand-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            </div>
+            <div>
+                <div class="brand-name">DeepSeek Core</div>
+                <div class="brand-ver">Analytics Platform</div>
+            </div>
+        </div>
+
+        <div class="sidebar-scroll">
+            <!-- Quick Commands -->
+            <div>
+                <div class="section-label">Quick Commands</div>
+                <div id="presets-list" style="display:flex;flex-direction:column;gap:3px;"></div>
+            </div>
+
+            <!-- History -->
+            <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <div class="section-label" style="margin-bottom:0">Search History</div>
+                    <button onclick="clearHistory()" style="background:none;border:none;font-size:11px;color:#334155;cursor:pointer;font-family:'JetBrains Mono',monospace;" onmouseover="this.style.color='#f43f5e'" onmouseout="this.style.color='#334155'">Clear</button>
+                </div>
+                <div id="history-list">
+                    <div style="font-size:11px;color:#334155;padding:2px 4px;font-style:italic;">No history yet</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            <div class="user-card">
+                <div class="user-info">
+                    <div class="user-avatar" id="user-avatar-sb">U</div>
+                    <div>
+                        <div class="user-name" id="user-name-sb">User Admin</div>
+                        <div class="user-status" id="status-text">Agent Ready</div>
+                    </div>
+                </div>
+                <button class="icon-btn" onclick="logoutApp()" title="Logout">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main id="main">
+        <div id="topbar">
+            <div class="topbar-left">
+                <span class="topbar-title">Conversational BI Engine</span>
+                <span class="live-badge"><span class="live-dot"></span> Live</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div id="proc-badge">
+                    <div class="proc-dots">
+                        <div class="proc-dot"></div><div class="proc-dot"></div><div class="proc-dot"></div>
+                    </div>
+                    <span id="proc-label">Processing…</span>
+                </div>
+                <span id="topbar-username" style="font-size:12px;color:#475569;">User Admin</span>
+                <button onclick="logoutApp()" style="font-size:11px;color:#475569;background:none;border:none;cursor:pointer;display:none;" id="mobile-logout">Logout</button>
+            </div>
+        </div>
+
+        <div id="chat"></div>
+
+        <div id="input-area">
+            <div class="input-bar">
+                <label class="bar-icon-btn" title="Attach file">
+                    <input type="file" id="file-input" style="display:none" onchange="onFileAttach(event)">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </label>
+
+                <input id="query-input" type="text" placeholder="Ask your data anything…" autocomplete="off"
+                    onkeydown="if(event.key==='Enter')sendMsg()">
+
+                <button class="bar-icon-btn" id="mic-btn" onclick="toggleVoice()" title="Voice input">
+                    <svg id="mic-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </button>
+
+                <button class="send-btn" onclick="sendMsg()" title="Send">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+
+            <div class="file-indicator" id="file-indicator">
+                <span id="file-name-display" class="mono">file.db</span>
+                <button class="file-x" onclick="clearFile()">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   WAIT for Chart.js + Mermaid to load before doing anything
+   ═══════════════════════════════════════════════════════════ */
+let chartJsReady = false, mermaidReady = false;
+function checkLibsReady() {
+    if (typeof Chart !== 'undefined') chartJsReady = true;
+    if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
+        mermaidReady = true;
+    }
+}
+// Poll every 100ms until libraries are loaded
+const libPoll = setInterval(() => {
+    checkLibsReady();
+    if (chartJsReady && mermaidReady) clearInterval(libPoll);
+}, 100);
+
+/* ── Particles ── */
+(function spawnParticles() {
+    const colors = ['#6366f1','#a855f7','#06b6d4','#10b981','#f59e0b'];
+    const c = document.getElementById('particles-container');
+    for (let i = 0; i < 18; i++) {
+        const el = document.createElement('div');
+        const s = Math.random()*3+1;
+        el.className = 'particle';
+        el.style.cssText = `width:${s}px;height:${s}px;left:${Math.random()*100}%;` +
+            `background:${colors[i%colors.length]};` +
+            `animation-duration:${Math.random()*18+12}s;animation-delay:${Math.random()*8}s;`;
+        c.appendChild(el);
+    }
+})();
+
+/* ── Presets ── */
+const PRESETS = [
+    { icon:'📊', label:'Top 5 products',    color:'#818cf8', q:'Show top 5 products by revenue' },
+    { icon:'🥧', label:'Customer cities',   color:'#c084fc', q:'Which city has most customers?' },
+    { icon:'📈', label:'Monthly trends',    color:'#34d399', q:'Show monthly order trends' },
+    { icon:'💰', label:'Total revenue',     color:'#fbbf24', q:'What is total revenue?' },
+    { icon:'🗃️', label:'DB schema',         color:'#60a5fa', q:'Draw the ER diagram' },
+    { icon:'🌍', label:'GDP chart',         color:'#22d3ee', q:'Show GDP of countries by bar chart' },
+    { icon:'👤', label:'CM of Tamil Nadu',  color:'#fb7185', q:'Who is CM of Tamil Nadu?' },
+    { icon:'🏛️', label:'PM of India',       color:'#fb923c', q:'Who is PM of India?' },
+    { icon:'🏆', label:'IPL winner',        color:'#facc15', q:'Who is the latest IPL winner?' },
+    { icon:'🛡️', label:'Strongest nation',  color:'#f87171', q:'Which is the strongest nation?' },
+    { icon:'🏴', label:'Capital of India',  color:'#e879f9', q:'What is the capital of India?' },
+    { icon:'📅', label:'World Cup date',    color:'#a78bfa', q:'What is the FIFA World Cup date?' },
+    { icon:'🤖', label:'What is AI?',       color:'#38bdf8', q:'What is Artificial Intelligence?' },
+    { icon:'🧠', label:'What is ML?',       color:'#2dd4bf', q:'What is Machine Learning?' },
+    { icon:'💬', label:'About bot',         color:'#818cf8', q:'Tell me about yourself' },
+];
+
+(function buildSidebar() {
+    const list = document.getElementById('presets-list');
+    PRESETS.forEach(p => {
+        const btn = document.createElement('button');
+        btn.className = 'quick-btn';
+        btn.onclick = () => applyPreset(p.q);
+        btn.innerHTML = `<span style="font-size:13px;">${p.icon}</span><span class="qb-label">${p.label}</span>`;
+        list.appendChild(btn);
+    });
+})();
+
+function applyPreset(q) {
+    document.getElementById('query-input').value = q;
+    document.getElementById('query-input').focus();
+}
+
+/* ── Login / Logout ── */
+function launchApp() {
+    const name = document.getElementById('login-name').value.trim() || 'User Admin';
+    const initials = name.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+
+    document.getElementById('user-avatar-sb').textContent = initials;
+    document.getElementById('user-name-sb').textContent = name;
+    document.getElementById('topbar-username').textContent = name;
+    currentUserInitials = initials;
+
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+
+    // Welcome message
+    addBubble(`Hey <strong>${name}!</strong> 👋 Welcome to <strong>DeepSeek DB Agent</strong> — your AI-powered analytics platform.<br>Select any quick command from the sidebar, upload a file, use voice input, or just ask me anything about your data, GK, AI/ML!`, 'agent');
+}
+
+function logoutApp() {
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('chat').innerHTML = '';
+    searchHistory = [];
+    renderHistory();
+    document.getElementById('status-text').textContent = 'Agent Ready';
+}
+
+/* ── Search History ── */
+let searchHistory = [];
+function addToHistory(q) {
+    if (!q || searchHistory.includes(q)) return;
+    searchHistory.unshift(q);
+    if (searchHistory.length > 8) searchHistory.pop();
+    renderHistory();
+}
+function renderHistory() {
+    const el = document.getElementById('history-list');
+    if (!searchHistory.length) {
+        el.innerHTML = '<div style="font-size:11px;color:#334155;padding:2px 4px;font-style:italic;">No history yet</div>';
+        return;
+    }
+    el.innerHTML = searchHistory.map(h => 
+        `<button class="history-pill" onclick="applyPreset(${JSON.stringify(h)})">${h.length>30?h.slice(0,30)+'…':h}</button>`
+    ).join('');
+}
+function clearHistory() { searchHistory = []; renderHistory(); }
+
+/* ── File ── */
+function onFileAttach(e) {
+    const f = e.target.files[0]; if (!f) return;
+    document.getElementById('file-name-display').textContent = f.name;
+    document.getElementById('file-indicator').classList.add('show');
+}
+function clearFile() {
+    document.getElementById('file-input').value = '';
+    document.getElementById('file-indicator').classList.remove('show');
+}
+
+/* ── Voice ── */
+let micEngine, micActive = false;
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    micEngine = new SR();
+    micEngine.onresult = e => { document.getElementById('query-input').value = e.results[0][0].transcript; };
+    micEngine.onstart = () => { micActive=true; document.getElementById('mic-icon').classList.add('mic-active'); setStatus('Listening…'); };
+    micEngine.onend = () => { micActive=false; document.getElementById('mic-icon').classList.remove('mic-active'); setStatus('Agent Ready'); };
+}
+function toggleVoice() {
+    if (!micEngine) { alert('Voice input not supported in this browser.'); return; }
+    if (micActive) micEngine.stop(); else micEngine.start();
+}
+function setStatus(t) { document.getElementById('status-text').textContent = t; }
+
+/* ── Processing badge ── */
+function showProc(show, label='Processing…') {
+    const b = document.getElementById('proc-badge');
+    document.getElementById('proc-label').textContent = label;
+    b.classList[show ? 'add' : 'remove']('show');
+}
+
+/* ══════════════════════════════════════════
+   SEND MESSAGE
+══════════════════════════════════════════ */
+const BACKEND = 'http://127.0.0.1:5000/api/chat';
+let currentUserInitials = 'U';
+
+async function sendMsg() {
+    const inp = document.getElementById('query-input');
+    const text = inp.value.trim(); if (!text) return;
+
+    addBubble(text, 'user');
+    addToHistory(text);
+    inp.value = '';
+    showProc(true, 'Compiling agent pipeline…');
+    setStatus('Processing…');
+
+    try {
+        const res = await fetch(BACKEND, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({query:text}) });
+        if (!res.ok) throw 0;
+        const p = await res.json();
+        showProc(false); setStatus('Agent Ready');
+        addBubble(p.message, 'agent', p.options);
+    } catch {
+        setTimeout(() => {
+            const {msg, data} = mockResponse(text.toLowerCase());
+            showProc(false); setStatus('Agent Ready');
+            addBubble(msg, 'agent', data);
+            clearFile();
+        }, 800);
+    }
+}
+
+/* ── Mock responses ── */
+function mockResponse(q) {
+    if (q.includes('top 5 product') || (q.includes('product') && q.includes('revenue')))
+        return { msg:'Tool: [generate_chart] — Revenue aggregated across top-selling products.',
+            data:{type:'chart',sql:"SELECT product_name, SUM(price*qty) AS rev FROM orders GROUP BY product_name ORDER BY rev DESC LIMIT 5;",
+                chart:{type:'bar',labels:['SuperNova Pro AI','DeepSeek API','Quantum Hub','Cloud Core','Cyber Shield'],datasets:[45200,38100,29400,21000,15300],label:'Revenue ($)',isMultiColor:false}}};
+
+    if (q.includes('city') || q.includes('cities') || q.includes('customer'))
+        return { msg:'Tool: [generate_chart] — Customer distribution by city.',
+            data:{type:'chart',sql:"SELECT city, COUNT(*) FROM users GROUP BY city ORDER BY 2 DESC LIMIT 5;",
+                chart:{type:'pie',labels:['San Francisco','New York','London','Bangalore','Tokyo'],datasets:[1240,890,620,410,280],label:'Customers',isMultiColor:true}}};
+
+    if (q.includes('trend') || q.includes('monthly'))
+        return { msg:'Tool: [generate_chart] — Monthly order frequency over 6-month window.',
+            data:{type:'chart',sql:"SELECT strftime('%m', order_date) AS m, COUNT(*) FROM orders GROUP BY m;",
+                chart:{type:'line',labels:['Jan','Feb','Mar','Apr','May','Jun'],datasets:[340,490,720,810,1100,1450],label:'Orders',isMultiColor:false}}};
+
+    if (q.includes('total revenue') || (q.includes('revenue') && !q.includes('product')))
+        return { msg:'Tool: [explain_data] — Total gross revenue from global_sales.',
+            data:{type:'metric',sql:"SELECT SUM(total_amount) FROM global_sales;",value:'$1,49,000',label:'Total Gross Revenue'}};
+
+    if (q.includes('er diagram') || q.includes('diagram') || q.includes('schema'))
+        return { msg:'Tool: [generate_flowchart] — ER diagram from active database schema.',
+            data:{type:'mermaid',sql:"SELECT name, sql FROM sqlite_master WHERE type='table';",
+                mermaid:`erDiagram\n    CUSTOMERS ||--o{ ORDERS : places\n    ORDERS ||--|{ LINE_ITEMS : contains\n    PRODUCTS ||--o{ LINE_ITEMS : ordered\n    CITIES ||--o{ CUSTOMERS : populates`}};
+
+    if (q.includes('gdp'))
+        return { msg:'Tool: [generate_chart] — GDP of top 6 world economies.',
+            data:{type:'chart',sql:"SELECT country, gdp FROM world_economy ORDER BY gdp DESC LIMIT 6;",
+                chart:{type:'bar',labels:['USA','China','Germany','Japan','India','UK'],datasets:[25.5,17.9,4.2,4.1,3.7,3.1],label:'GDP (Trillion USD)',isMultiColor:false,color:'rgba(6,182,212,0.7)'}}};
+
+    if (q.includes('cm') || q.includes('tamil nadu') || q.includes('chief minister'))
+        return { msg:'GK Query: Chief Minister of Tamil Nadu.',
+            data:{type:'info',tint:'rose',icon:'👤',title:'Chief Minister — Tamil Nadu',
+                rows:[['Name','M.K. Stalin'],['Party','Dravida Munnetra Kazhagam (DMK)'],['In Office','Since May 2021'],['State','Tamil Nadu, India'],['Constituency','Kolathur, Chennai']]}};
+
+    if (q.includes('pm') || q.includes('prime minister'))
+        return { msg:'GK Query: Prime Minister of India.',
+            data:{type:'info',tint:'orange',icon:'🏛️',title:'Prime Minister — India',
+                rows:[['Name','Narendra Modi'],['Party','Bharatiya Janata Party (BJP)'],['In Office','Since May 2014'],['Country','India'],['Current Term','2024 – 2029']]}};
+
+    if (q.includes('ipl'))
+        return { msg:'Sports Query: Latest IPL winner.',
+            data:{type:'info',tint:'yellow',icon:'🏆',title:'IPL 2024 — Winner',
+                rows:[['Tournament','IPL 2024'],['Winner','Kolkata Knight Riders (KKR)'],['Runner-up','Sunrisers Hyderabad (SRH)'],['Season','17th Edition'],['Venue','MA Chidambaram Stadium']]}};
+
+    if (q.includes('strongest') || q.includes('powerful nation'))
+        return { msg:'GK Query: Strongest nation by global power indices.',
+            data:{type:'info',tint:'red',icon:'🛡️',title:'Strongest Nation — Rankings',
+                rows:[['Rank #1','United States of America'],['Military','Defense budget: $858 Billion'],['Economy','GDP: $25.5 Trillion'],['Nuclear','~5,500 warheads'],['Alliances','NATO, G7, G20 leader']]}};
+
+    if (q.includes('capital') && q.includes('india'))
+        return { msg:'GK Query: Capital of India.',
+            data:{type:'metric',sql:'',value:'New Delhi',label:'Capital of India'}};
+
+    if (q.includes('world cup') || q.includes('fifa'))
+        return { msg:'Sports Query: FIFA World Cup 2026.',
+            data:{type:'info',tint:'violet',icon:'📅',title:'FIFA World Cup 2026',
+                rows:[['Tournament','FIFA World Cup 2026'],['Dates','June 11 – July 19, 2026'],['Hosts','USA, Canada, Mexico'],['Teams','48 (expanded format)'],['Final Venue','MetLife Stadium, New Jersey']]}};
+
+    if (q.includes('what is ai') || q.includes('artificial intelligence'))
+        return { msg:'Knowledge: Artificial Intelligence explained.',
+            data:{type:'info',tint:'sky',icon:'🤖',title:'What is Artificial Intelligence (AI)?',
+                rows:[['Definition','Simulation of human intelligence in machines'],['Types','Narrow AI, General AI, Super AI'],['Key Areas','ML, NLP, Computer Vision, Robotics'],['Examples','ChatGPT, AlphaGo, Self-driving cars'],['Goal','Automate tasks requiring human cognition']]}};
+
+    if (q.includes('what is ml') || q.includes('machine learning'))
+        return { msg:'Knowledge: Machine Learning explained.',
+            data:{type:'info',tint:'teal',icon:'🧠',title:'What is Machine Learning (ML)?',
+                rows:[['Definition','Subset of AI — machines learn from data patterns'],['Types','Supervised, Unsupervised, Reinforcement'],['Key Algos','Linear Regression, SVM, Neural Networks'],['Tools','Python, TensorFlow, PyTorch, Scikit-learn'],['Applications','Fraud detection, Recommendations, NLP']]}};
+
+    if (q.includes('about') || q.includes('yourself'))
+        return { msg:'Hello! I\'m DeepSeek DB Agent, your AI-powered analytics companion.',
+            data:{type:'about'}};
+
+    return { msg:'Tool: [execute_query] — Query processed against active dataset.',
+        data:{type:'metric',sql:'SELECT COUNT(*) FROM dataset_feed;',value:'✓ Active',label:'Dataset Feed Status'}};
+}
+
+/* ══════════════════════════════════════════
+   CHAT BUBBLE RENDERER
+══════════════════════════════════════════ */
+let bubbleCount = 0;
+
+function addBubble(text, sender, data) {
+    bubbleCount++;
+    const id = bubbleCount;
+    const chat = document.getElementById('chat');
+    const row = document.createElement('div');
+    row.className = `bubble-row${sender==='user'?' user':''}`;
+
+    /* avatar */
+    const av = document.createElement('div');
+    av.className = `avatar ${sender==='user'?'user-av':'agent'}`;
+    if (sender==='user') av.textContent = currentUserInitials;
+    else av.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:16px;height:16px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+
+    /* bubble */
+    const bub = document.createElement('div');
+    bub.className = `bubble ${sender}`;
+
+    const textEl = document.createElement('p');
+    textEl.id = `text-${id}`;
+    bub.appendChild(textEl);
+
+    /* extra result block (placeholder, filled after typewriter) */
+    const extra = document.createElement('div');
+    extra.id = `extra-${id}`;
+    bub.appendChild(extra);
+
+    if (sender === 'user') { row.appendChild(av); row.appendChild(bub); }
+    else { row.appendChild(av); row.appendChild(bub); }
+    chat.appendChild(row);
+    chat.scrollTop = chat.scrollHeight;
+
+    /* typewriter */
+    let i = 0;
+    const raw = text.replace(/\n/g,' ');
+    function type() {
+        if (i < raw.length) {
+            textEl.innerHTML = raw.slice(0, ++i);
+            chat.scrollTop = chat.scrollHeight;
+            setTimeout(type, 7);
+        } else {
+            if (data) renderExtra(id, data);
+        }
+    }
+    type();
+}
+
+/* ── Render result block after text ── */
+function renderExtra(id, data) {
+    const el = document.getElementById(`extra-${id}`);
+    if (!el) return;
+
+    if (data.type === 'chart') {
+        el.innerHTML = `
+            <div class="result-block">
+                <div class="result-header">
+                    <div class="result-header-left">
+                        📊 <span>generate_chart output</span>
+                    </div>
+                    <button class="export-btn" onclick="exportChart('c-${id}')">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export
+                    </button>
+                </div>
+                <div class="chart-wrap"><canvas id="c-${id}"></canvas></div>
+                ${data.sql ? sqlBlock(data.sql) : ''}
+            </div>`;
+        const chat = document.getElementById('chat');
+        chat.scrollTop = chat.scrollHeight;
+
+        // Wait for Chart.js
+        function tryRenderChart() {
+            if (!chartJsReady || typeof Chart === 'undefined') { setTimeout(tryRenderChart, 150); return; }
+            const ctx = document.getElementById(`c-${id}`);
+            if (!ctx) return;
+            const c = data.chart;
+            const multiColors = ['#6366f1','#a855f7','#10b981','#f59e0b','#06b6d4','#f43f5e'];
+            new Chart(ctx.getContext('2d'), {
+                type: c.type,
+                data: {
+                    labels: c.labels,
+                    datasets: [{
+                        label: c.label,
+                        data: c.datasets,
+                        backgroundColor: c.isMultiColor ? multiColors : (c.color || 'rgba(99,102,241,0.65)'),
+                        borderColor: c.isMultiColor ? multiColors : '#6366f1',
+                        borderWidth: c.type==='pie' ? 1 : 2,
+                        tension: 0.4,
+                        pointBackgroundColor: '#6366f1',
+                        pointRadius: c.type==='line' ? 4 : 0,
+                        fill: c.type==='line' ? { target:'origin', above:'rgba(99,102,241,0.08)' } : false
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend:{ display: c.type==='pie', labels:{ color:'#94a3b8', font:{size:11} } } },
+                    scales: c.type!=='pie' ? {
+                        x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#64748b',font:{size:11}} },
+                        y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#64748b',font:{size:11}} }
+                    } : {}
+                }
+            });
+        }
+        tryRenderChart();
+    }
+
+    else if (data.type === 'mermaid') {
+        const mid = `m-${id}`;
+        el.innerHTML = `
+            <div class="result-block">
+                <div class="result-header">
+                    <div class="result-header-left">🗃️ <span>generate_flowchart output</span></div>
+                </div>
+                <div class="mermaid-wrap"><div class="mermaid" id="${mid}">${data.mermaid}</div></div>
+                ${data.sql ? sqlBlock(data.sql) : ''}
+            </div>`;
+        function tryMermaid() {
+            if (!mermaidReady || typeof mermaid === 'undefined') { setTimeout(tryMermaid, 150); return; }
+            const el2 = document.getElementById(mid);
+            if (el2) mermaid.init(undefined, el2);
+        }
+        tryMermaid();
+    }
+
+    else if (data.type === 'metric') {
+        el.innerHTML = `
+            <div class="metric-card">
+                <div class="metric-label">${data.label}</div>
+                <div class="metric-val">${data.value}</div>
+            </div>
+            ${data.sql ? sqlBlock(data.sql) : ''}`;
+    }
+
+    else if (data.type === 'info') {
+        const rows = data.rows.map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('');
+        el.innerHTML = `
+            <div class="info-table tint-${data.tint}" style="border-radius:12px;overflow:hidden;margin-top:10px;border:1px solid rgba(255,255,255,0.07);">
+                <div class="info-table-head">
+                    <span style="font-size:16px;">${data.icon}</span> ${data.title}
+                </div>
+                <table class="info-table"><tbody>${rows}</tbody></table>
+            </div>`;
+    }
+
+    else if (data.type === 'about') {
+        el.innerHTML = `
+            <div class="info-table tint-indigo" style="border-radius:12px;overflow:hidden;margin-top:10px;border:1px solid rgba(255,255,255,0.07);">
+                <div class="info-table-head">🤖 About DeepSeek DB Agent</div>
+                <table class="info-table"><tbody>
+                    <tr><td>Version</td><td>v1.2.0</td></tr>
+                    <tr><td>Model</td><td>DeepSeek Core LLM (Backend Connected)</td></tr>
+                    <tr><td>Capabilities</td><td>SQL generation, Charts, GK queries, File analysis</td></tr>
+                    <tr><td>Chart types</td><td>Bar, Line, Pie, Metric, Mermaid ER</td></tr>
+                    <tr><td>Voice input</td><td>Web Speech API (Chrome / Edge)</td></tr>
+                    <tr><td>File upload</td><td>DB files, CSV, JSON for context</td></tr>
+                    <tr><td>History</td><td>Last 8 queries saved in sidebar</td></tr>
+                    <tr><td>Built by</td><td>Analytics Platform Team — DeepSeek Stack</td></tr>
+                </tbody></table>
+            </div>`;
+    }
+
+    const chat = document.getElementById('chat');
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function sqlBlock(sql) {
+    return `<div class="sql-block">
+        <div class="sql-header">🗄️ Generated SQL</div>
+        <div class="sql-body">${sql}</div>
+    </div>`;
+}
+
+function exportChart(id) {
+    const c = document.getElementById(id); if (!c) return;
+    const a = document.createElement('a');
+    a.download = 'analytics-chart.png';
+    a.href = c.toDataURL(); a.click();
+}
+</script>
+</body>
+</html>
